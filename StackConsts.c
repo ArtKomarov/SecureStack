@@ -8,9 +8,9 @@
 #include "StackConsts.h"
 #include <errno.h>
 
-const ui c1 = 0xDE0CAFCA;
-const ui c2 = 0xDEADDEAD;
-const ui h1 = 0x0000000E;
-const llu mask = 0x100000000 - 1;//8589934591; // 2^33 - 1
-const ui odds = 48;
-const int lim = 512;
+const ui CANARY1_CONST = 0xDE0CAFCA;
+const ui CANARY2_CONST = 0xDEADDEAD;
+const ui HASH_START = 0x0000000E;
+const llu MASK = 0x100000000 - 1;//8589934591; // 2^33 - 1
+const ui ODDS = 48;
+const int LIMIT = 512;
