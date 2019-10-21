@@ -9,12 +9,9 @@
 #define STACK_H_
 
 #include <stdio.h>
+#include "StackConsts.h"
 
-typedef unsigned int ui;
-typedef unsigned long long int llu;
-typedef int stk_t;
-
-typedef struct stack {
+typedef struct stack { //
     ui canary1;
     ui size;
     ui buff;
@@ -34,7 +31,8 @@ int   StackPush     (stack *stk, stk_t a); //Push element a to stack stk
 stk_t StackPop      (stack *stk);          //Get element from stack stk
 int   StackPrint    (stack *stk);          //Print state of stack to file
 int   StackDestruct (stack* stk);          //Destruct the stack stk (free memory, set start values to support fields)
-int   PrintErrors   (const stack stk);     //Print error explanation of stk.err to file stk.ferr
+int   PrintError    (const stack stk);     //Print error explanation of stk.err to file stk.ferr
+int   PrintSAE      (stack* stk);          //Call functions StackPrint(stk) and PrintError(*stk)
 int   IncreaseBuff  (stack *stk, ui a);    //Increase buffer of stack stk by a value (ret 0 on success)
 
 char* CheckAddress  (void  *p);            //Check address of a pointer (support function)

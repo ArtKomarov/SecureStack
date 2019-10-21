@@ -10,7 +10,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
-#include "StackConsts.h"
+//#include "StackConsts.h"
 #include "Stack.h"
 #include <math.h>
 
@@ -20,49 +20,58 @@ enum { //Error numbers
     EHASH  = 134,
     ECANARYBOTH = 135,
     EOPFILEERR = 136,
-    EOPFILECH = 137
+    EOPFILECH = 137,
+    EUNDERFLOW = 138,
+    EBUFEMPTY = ENOBUFS,
+    ENOTENMEM = ENOMEM,
+    BUFFOVERFLOW = EOVERFLOW
+
 };
 
 stack StackConstruct(ui buff, char* StkCheckFile, char* StkErrFile) { // +argument buff
     stack stk;
+    stk.err = 0;
     stk.canary1 = CANARY1_CONST;
     stk.size = 0;
-    stk.buff = buff;
+    if(buff >= 0) stk.buff = buff;
+    else {
+        stk.err = EUNDERFLOW;
+        stk.buff = 0;
+    }
     stk.stk = NULL;
-    stk.err = 0;
     stk.stk = (stk_t*)calloc(buff, sizeof(stk_t));
     if(! stk.stk) {
-        stk.err = ENOBUFS;
+        stk.err = EBUFEMPTY;
         buff = 0;
+    }
+    else {
+        ui i;
+        for(i = 0; i < buff; i++)
+            stk.stk[i] = POISON;
     }
     stk.hash = HASH_START + buff;
     stk.canary2 = CANARY2_CONST;
 
-    if(StkCheckFile == NULL) {
-        stk.stkprint = fopen("StkCheck.txt", "w");
-        if(stk.stkprint == NULL)
-            stk.err = EOPFILECH;
-    }
-    else {
+    if(StkCheckFile == NULL)
+        stk.stkprint = fopen(STR_CHECK_FILE, "w");
+    else
         stk.stkprint = fopen(StkCheckFile, "w");
-        if(stk.stkprint == NULL) {
-            stk.err = EOPFILECH;
-            stk.stkprint = fopen("StkCheck.txt", "w");
-        }
+    if(stk.stkprint == NULL) {
+        stk.err = EOPFILECH;
+        PrintSAE(&stk);
+        stk.stkprint = stderr;
     }
 
-    if(StkErrFile == NULL) {
-        stk.ferr = fopen("StkErrs.txt", "w");
-        if(stk.ferr == NULL)
-            stk.err = EOPFILEERR;
-    }
-    else {
+    if(StkErrFile == NULL)
+        stk.ferr = fopen(STR_ERR_FILE, "w");
+    else
         stk.ferr = fopen(StkErrFile, "w");
-        if(stk.ferr == NULL) {
-            stk.err = EOPFILEERR;
-            stk.stkprint = fopen("StkErrs.txt", "w");
-        }
+    if(stk.ferr == NULL) {
+        stk.err = EOPFILECH;
+        PrintSAE(&stk);
+        stk.ferr = stderr;
     }
+    if(stk.err != 0) PrintSAE(&stk);
     return stk;
 }
 
@@ -81,11 +90,11 @@ ui Hash(const stack stk) {
     return hash;
 }
 
-int StackOk(stack *stk) { //EOVERFLOW
+int StackOk(stack *stk) {
     assert(stk != NULL);
-    if(stk->stk == NULL && stk->err != ENOMEM) {
-        stk->err = ENOBUFS;
-        return ENOBUFS;
+    if(stk->stk == NULL && stk->err != ENOTENMEM) {
+        stk->err = EBUFEMPTY;
+        return EBUFEMPTY;
     }
     if(stk->canary1 != CANARY1_CONST && stk->canary2 != CANARY2_CONST) {
         stk->err = ECANARYBOTH;
@@ -100,8 +109,8 @@ int StackOk(stack *stk) { //EOVERFLOW
         return ECANARY2;
     }
     if(stk->size > stk->buff) {
-        stk->err = ENOMEM;
-        return ENOMEM;
+        stk->err = ENOTENMEM;
+        return ENOTENMEM;
     }
     if(stk->hash != Hash(*stk)) {
         stk->err = EHASH;
@@ -113,58 +122,75 @@ int StackOk(stack *stk) { //EOVERFLOW
 int StackPush(stack *stk, stk_t a) {
     assert(stk != NULL);
     int check = StackCheck(stk);
-    if(check == ENOBUFS){
-        stk->err = ENOBUFS;
-        PrintErrors(*stk);
-        return ENOBUFS;
+    if(check) {
+        if(check == EBUFEMPTY){
+            stk->err = EBUFEMPTY;
+            PrintSAE(stk);
+            return EBUFEMPTY;
+        }
+        else PrintSAE(stk);
     }
     stk_t* sup;
     //stk->size++; //del
 
     if(stk->size + 1 > stk->buff) {
         if(stk->buff * 2 < stk->size) {
-            stk->err = EOVERFLOW;
+            stk->err = BUFFOVERFLOW;
             //stk->size--;
-            PrintErrors(*stk);
-            return EOVERFLOW;
+            PrintSAE(stk);
+            return BUFFOVERFLOW;
         }
         stk->buff *= 2;
         sup = (stk_t*)realloc(stk->stk, stk->buff * sizeof(stk_t));
         //stk->stk = (stk_t*)realloc(stk->stk, stk->buff*sizeof(stk_t)); //memory leak possible
         if(sup == NULL) {
-            stk->err = ENOMEM;
-            return ENOMEM;
+            stk->err = ENOTENMEM;
+            PrintSAE(stk);
+            return ENOTENMEM;
         }
-        else
+        else {
             stk->stk = sup;
+            ui i;
+            for(i = stk->size; i < stk->buff; i++)
+                stk->stk[i] = POISON;
+        }
 
     }
 
     stk->stk[stk->size++] = a; //postfix
     stk->hash = Hash(*stk);
-    return StackCheck(stk);
+    check = StackCheck(stk);
+    if(check) PrintSAE(stk);
+    return check;
 }
 
 stk_t StackPop(stack *stk) {
     assert(stk != NULL);
     stk_t a;
-    StackCheck(stk);
-    if(stk->size == 0) return 0; //Stack free
+    if(StackCheck(stk))
+        PrintSAE(stk);
+    if(stk->size == 0) {
+        stk->err = EUNDERFLOW;
+        PrintSAE(stk);
+        return POISON; //Stack free
+    }
 
     a = stk->stk[--stk->size];
 
     if(stk->size <= stk->buff/2 - ODDS) {
         stk->buff /= 2;
-        stk->stk = (stk_t*)realloc(stk->stk, stk->buff); //поправь
-        /* Я так понял, при уменьшении количества памяти, NULL возвращаться не может
-         * if(stk->stk == NULL) {
-            stk->err = ENOMEM;
-            return ENOMEM;
-        }*/
+        stk_t* sup = (stk_t*)realloc(stk->stk, stk->buff); //поправь
+        if(sup == NULL) {
+            stk->err = ENOTENMEM;
+            PrintSAE(stk);
+            return a;
+        }
+        stk->stk = sup;
     }
 
     stk->hash = Hash(*stk);
-    StackCheck(stk);
+    if(StackCheck(stk))
+        PrintSAE(stk);
     return a;
 }
 
@@ -218,7 +244,7 @@ char* CheckAddress(void* p) {//address
 }
 
 char* CheckNumber(stk_t a) {
-    if(a == 0 || a < (-LIMIT) || a > LIMIT)
+    if(a == POISON || a < (-LIMIT) || a > LIMIT)
         return " (Poison?)";
     return "";
 }
@@ -243,7 +269,7 @@ int StackDestruct(stack* stk) {
     return 0;
 }
 
-int PrintErrors(const stack stk) {
+int PrintError(const stack stk) {
     if(stk.err == 0)
         return 1;
     if(stk.ferr == NULL)
@@ -267,10 +293,10 @@ int PrintErrors(const stack stk) {
         s = strdup("Hash is changed, our stack is poison!");
         //errno = EADDRINUSE;
         break;
-    case ENOBUFS:
+    case EBUFEMPTY:
         s = strdup("Stack is a NULL pointer!");
         break;
-    case ENOMEM:
+    case ENOTENMEM:
         s = strdup("Can't reserve memory for stack!");
         //errno = ENOMEM;
         break;
@@ -280,8 +306,11 @@ int PrintErrors(const stack stk) {
     case EOPFILECH:
         s = strdup("Error open file to print stack!");
         break;
-    case EOVERFLOW:
+    case BUFFOVERFLOW:
         s = strdup("Too large buffer size!");
+        break;
+    case EUNDERFLOW:
+        s = strdup("Stack underflow!");
         break;
     default:
         s = strdup("There is extra error!");
@@ -299,36 +328,43 @@ int StackCheck(stack *stk) {
     int flag = 0;
     if(stk->hash != Hash(*stk)) {
         stk->err = EHASH;
-        PrintErrors(*stk);
+        PrintError(*stk);
         flag = 1;
     }
     if(stk->size > stk->buff) {
-        stk->err = ENOMEM;
-        PrintErrors(*stk);
+        stk->err = ENOTENMEM;
+        PrintError(*stk);
         flag = 1;
     }
     if(stk->canary2 != CANARY2_CONST) {
         stk->err = ECANARY2;
-        PrintErrors(*stk);
+        PrintError(*stk);
         flag = 1;
     }
     if(stk->canary1 != CANARY1_CONST) {
         stk->err = ECANARY1;
-        PrintErrors(*stk);
+        PrintError(*stk);
         flag = 1;
     }
     if(stk->canary1 != CANARY1_CONST && stk->canary2 != CANARY2_CONST) {
         stk->err = ECANARYBOTH;
-        PrintErrors(*stk);
+        PrintError(*stk);
         flag = 1;
     }
-    if(stk->stk == NULL && stk->err != ENOMEM) {
-        stk->err = ENOBUFS;
-        PrintErrors(*stk);
+    if(stk->stk == NULL) {
+        stk->err = EBUFEMPTY;
+        PrintError(*stk);
         flag = 1;
     }
-    if(stk->err != 0 && flag == 0) PrintErrors(*stk);
+    if(stk->err != 0 && flag == 0) PrintError(*stk);
+    //StackPrint(stk);
     return stk->err;
+}
+
+int PrintSAE(stack* stk) {
+    StackPrint(stk);
+    PrintError(*stk);
+    return 0;
 }
 
 int IncreaseBuff(stack *stk, ui a) {
@@ -336,7 +372,7 @@ int IncreaseBuff(stack *stk, ui a) {
     if(stk->buff + a < stk->buff) return -1;
     stk_t* sup = (stk_t*)realloc(stk->stk, (stk->buff + a) * sizeof(stk_t));
     if(sup == NULL)
-        return ENOMEM;
+        return ENOTENMEM;
     else
         stk->stk = sup;
     return 0;
