@@ -14,6 +14,8 @@
 #include "Stack.h"
 #include <math.h>
 
+#define DEBUG
+
 enum { //Error numbers
     ECANARY1 = 132,
     ECANARY2 = 133,
@@ -52,6 +54,7 @@ stack StackConstruct(ui buff, char* StkCheckFile, char* StkErrFile) { // +argume
     stk.hash = HASH_START + buff;
     stk.canary2 = CANARY2_CONST;
 
+#ifdef DEBUG
     if(StkCheckFile == NULL)
         stk.stkprint = fopen(STR_CHECK_FILE, "w");
     else
@@ -71,7 +74,9 @@ stack StackConstruct(ui buff, char* StkCheckFile, char* StkErrFile) { // +argume
         PrintSAE(&stk);
         stk.ferr = stderr;
     }
+
     if(stk.err != 0) PrintSAE(&stk);
+#endif //DEBUG
     return stk;
 }
 
@@ -91,7 +96,7 @@ ui Hash(const stack stk) {
 }
 
 int StackOk(stack *stk) {
-    assert(stk != NULL);
+    MyAssert(stk);
     if(stk->stk == NULL && stk->err != ENOTENMEM) {
         stk->err = EBUFEMPTY;
         return EBUFEMPTY;
@@ -120,8 +125,10 @@ int StackOk(stack *stk) {
 }
 
 int StackPush(stack *stk, stk_t a) {
-    assert(stk != NULL);
-    int check = StackCheck(stk);
+    MyAssert(stk);
+    int check = 0;
+#ifdef DEBUG
+    check = StackCheck(stk);
     if(check) {
         if(check == EBUFEMPTY){
             stk->err = EBUFEMPTY;
@@ -130,22 +137,27 @@ int StackPush(stack *stk, stk_t a) {
         }
         else PrintSAE(stk);
     }
+#endif
     stk_t* sup;
     //stk->size++; //del
 
     if(stk->size + 1 > stk->buff) {
+#ifdef DEBUG
         if(stk->buff * 2 < stk->size) {
             stk->err = BUFFOVERFLOW;
             //stk->size--;
             PrintSAE(stk);
             return BUFFOVERFLOW;
         }
+#endif
         stk->buff *= 2;
         sup = (stk_t*)realloc(stk->stk, stk->buff * sizeof(stk_t));
         //stk->stk = (stk_t*)realloc(stk->stk, stk->buff*sizeof(stk_t)); //memory leak possible
         if(sup == NULL) {
             stk->err = ENOTENMEM;
+#ifdef DEBUG
             PrintSAE(stk);
+#endif
             return ENOTENMEM;
         }
         else {
@@ -158,15 +170,18 @@ int StackPush(stack *stk, stk_t a) {
     }
 
     stk->stk[stk->size++] = a; //postfix
+#ifdef DEBUG
     stk->hash = Hash(*stk);
     check = StackCheck(stk);
     if(check) PrintSAE(stk);
+#endif
     return check;
 }
 
 stk_t StackPop(stack *stk) {
-    assert(stk != NULL);
+    MyAssert(stk);
     stk_t a;
+#ifdef DEBUG
     if(StackCheck(stk))
         PrintSAE(stk);
     if(stk->size == 0) {
@@ -174,28 +189,32 @@ stk_t StackPop(stack *stk) {
         PrintSAE(stk);
         return POISON; //Stack free
     }
-
+#endif
     a = stk->stk[--stk->size];
 
     if(stk->size <= stk->buff/2 - ODDS) {
         stk->buff /= 2;
-        stk_t* sup = (stk_t*)realloc(stk->stk, stk->buff); //поправь
+        stk_t* sup = (stk_t*)realloc(stk->stk, stk->buff);
+#ifdef DEBUG
         if(sup == NULL) {
             stk->err = ENOTENMEM;
             PrintSAE(stk);
             return a;
         }
+#endif
         stk->stk = sup;
     }
 
+#ifdef DEBUG
     stk->hash = Hash(*stk);
     if(StackCheck(stk))
         PrintSAE(stk);
+#endif
     return a;
 }
 
 int StackPrint(stack* stk) {
-    assert(stk != NULL);
+    MyAssert(stk);
     if(stk->stkprint == NULL)
         return 0;
     StackCheck(stk);
@@ -237,7 +256,7 @@ int StackPrint(stack* stk) {
 }
 
 char* CheckAddress(void* p) {//address
-    assert(p != NULL);
+    MyAssert(p);
     if(p == NULL || (llu)p == 0 || (llu)p == 0xFFFFFFFFFFFFFFFF)
         return "(Fail?)";
     return "(OK)";
@@ -250,7 +269,7 @@ char* CheckNumber(stk_t a) {
 }
 
 int StackDestruct(stack* stk) {
-    assert(stk != NULL);
+    MyAssert(stk);
     stk->canary1 = CANARY1_CONST;
     stk->size    = 0;
     stk->buff    = 0;
@@ -258,12 +277,14 @@ int StackDestruct(stack* stk) {
         free(stk->stk);
     stk->stk     = NULL;
     stk->hash    = HASH_START;
+#ifdef DEBUG
     if(stk->ferr)
         fclose(stk->ferr);
     stk->ferr = NULL;
     if(stk->stkprint)
         fclose(stk->stkprint);
     stk->stkprint = NULL;
+#endif
     stk->err     = 0;
     stk->canary2 = CANARY2_CONST;
     return 0;
@@ -324,7 +345,7 @@ int PrintError(const stack stk) {
 }
 
 int StackCheck(stack *stk) {
-    assert(stk != NULL);
+    MyAssert(stk);
     int flag = 0;
     if(stk->hash != Hash(*stk)) {
         stk->err = EHASH;
@@ -362,18 +383,27 @@ int StackCheck(stack *stk) {
 }
 
 int PrintSAE(stack* stk) {
+    MyAssert(stk);
     StackPrint(stk);
     PrintError(*stk);
     return 0;
 }
 
 int IncreaseBuff(stack *stk, ui a) {
-    assert(stk != NULL);
+    MyAssert(stk);
     if(stk->buff + a < stk->buff) return -1;
     stk_t* sup = (stk_t*)realloc(stk->stk, (stk->buff + a) * sizeof(stk_t));
     if(sup == NULL)
         return ENOTENMEM;
     else
         stk->stk = sup;
+    return 0;
+}
+
+int MyAssert(void* p) {
+    if(p == NULL) {
+        printf("ERROR: NULL pointer in function!\n");
+        exit(-1);
+    }
     return 0;
 }

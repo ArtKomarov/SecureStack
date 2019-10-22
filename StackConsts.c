@@ -17,5 +17,5 @@ const ui ODDS = 48;
 const stk_t POISON = 0xEDAED0ED;
 const stk_t LIMIT = 512;
 const int STR_LEN = 32;
-const char STR_ERR_FILE[] = "StkErrs.txt";
+const char STR_ERR_FILE[]   = "StkErrs.txt";
 const char STR_CHECK_FILE[] = "StkCheck.txt";

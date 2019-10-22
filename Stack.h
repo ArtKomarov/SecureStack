@@ -37,5 +37,6 @@ int   IncreaseBuff  (stack *stk, ui a);    //Increase buffer of stack stk by a v
 
 char* CheckAddress  (void  *p);            //Check address of a pointer (support function)
 char* CheckNumber   (stk_t a);             //Check number boundaries (support function)
+int   MyAssert      (void* p);             //If p is nulptr, prints message to stdout and exit(-1) process
 
 #endif /* STACK_H_ */

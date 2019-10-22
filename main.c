@@ -17,12 +17,12 @@ int main() {
     StackPush(&stk, a);
     for(int i = 0; i < 350; i++) {
         StackPush(&stk, b+i);
-        StackPrint(&stk);
+        //StackPrint(&stk);
     }
     //printf("a = %d\n", a.field);
-    StackPrint(&stk);
+    //StackPrint(&stk);
     StackPush(&stk, b);
-    StackPrint(&stk);
+    //StackPrint(&stk);
     a = StackPop(&stk);
     a = StackPop(&stk);
     printf("a = %d\n", a);
