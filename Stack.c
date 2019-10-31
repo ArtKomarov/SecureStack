@@ -30,7 +30,7 @@ enum { //Error numbers
 
 };
 
-stack StackConstruct(ui buff, char* StkCheckFile, char* StkErrFile) { // +argument buff
+stack StackConstruct(ui buff, char* StkCheckFile, char* StkErrFile) {
     stack stk;
     stk.err = 0;
     stk.canary1 = CANARY1_CONST;
@@ -88,7 +88,7 @@ ui Hash(const stack stk) {
     else
         len = stk.buff;
     if(stk.stk == NULL) return hash;
-    for(ui i = 0; i < len; i++) { //Check if buff > size
+    for(ui i = 0; i < len; i++) {
         hash += stk.stk[i] * (i+1);
     }
     hash += stk.buff;
@@ -139,20 +139,17 @@ int StackPush(stack *stk, stk_t a) {
     }
 #endif
     stk_t* sup;
-    //stk->size++; //del
 
     if(stk->size + 1 > stk->buff) {
 #ifdef DEBUG
         if(stk->buff * 2 < stk->size) {
             stk->err = BUFFOVERFLOW;
-            //stk->size--;
             PrintSAE(stk);
             return BUFFOVERFLOW;
         }
 #endif
         stk->buff *= 2;
         sup = (stk_t*)realloc(stk->stk, stk->buff * sizeof(stk_t));
-        //stk->stk = (stk_t*)realloc(stk->stk, stk->buff*sizeof(stk_t)); //memory leak possible
         if(sup == NULL) {
             stk->err = ENOTENMEM;
 #ifdef DEBUG
@@ -190,6 +187,12 @@ stk_t StackPop(stack *stk) {
         return POISON; //Stack free
     }
 #endif
+#ifndef DEBUG
+    if(stk->size == 0) {
+        stk->err = EUNDERFLOW;
+        return POISON; //Stack free
+    }
+#endif
     a = stk->stk[--stk->size];
 
     if(stk->size <= stk->buff/2 - ODDS) {
@@ -218,11 +221,6 @@ int StackPrint(stack* stk) {
     if(stk->stkprint == NULL)
         return 0;
     StackCheck(stk);
-    /*FILE* fw = fopen("StkCheck.txt", "a");
-    if(fw == NULL) {
-        perror("fopen");
-        return ENFILE;
-    }*/
 
     llu name = (llu)stk;
     name = (name & MASK) >> 24;
@@ -251,7 +249,6 @@ int StackPrint(stack* stk) {
         fprintf(stk->stkprint, "  (OK)\n");
     fprintf(stk->stkprint, "   canary2 = 0x%X\n}\n", stk->canary2);
     //stk->hash = Hash(*stk);
-    //fclose(fw);
     return 0;
 }
 
@@ -300,26 +297,21 @@ int PrintError(const stack stk) {
     switch(stk.err){
     case ECANARYBOTH:
         s = strdup("Canary1 and canary2 are changed, maybe some array went beyond the boundaries and poison stack!");
-        //errno = EADDRINUSE;
         break;
     case ECANARY1:
         s = strdup("Canary1 is changed, maybe some array went beyond the boundaries and poison stack!");
-        //errno = EADDRINUSE;
         break;
     case ECANARY2:
         s = strdup("Canary2 is changed, maybe some array went beyond the boundaries and poison stack!");
-        //errno = EADDRINUSE;
         break;
     case EHASH:
         s = strdup("Hash is changed, our stack is poison!");
-        //errno = EADDRINUSE;
         break;
     case EBUFEMPTY:
         s = strdup("Stack is a NULL pointer!");
         break;
     case ENOTENMEM:
         s = strdup("Can't reserve memory for stack!");
-        //errno = ENOMEM;
         break;
     case EOPFILEERR:
         s = strdup("Error open file to print errors!");
@@ -340,7 +332,6 @@ int PrintError(const stack stk) {
     errno = stk.err;
     fprintf(stk.ferr, "ERROR %d: %s\n", stk.err, s);
     free(s);
-    //fclose(fwe);
     return 0;
 }
 
@@ -378,7 +369,6 @@ int StackCheck(stack *stk) {
         flag = 1;
     }
     if(stk->err != 0 && flag == 0) PrintError(*stk);
-    //StackPrint(stk);
     return stk->err;
 }
 
