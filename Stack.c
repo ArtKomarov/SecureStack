@@ -14,7 +14,7 @@
 #include "Stack.h"
 #include <math.h>
 
-#define DEBUG
+//#define DEBUG
 
 enum { //Error numbers
     ECANARY1 = 132,
@@ -195,7 +195,7 @@ stk_t StackPop(stack *stk) {
 #endif
     a = stk->stk[--stk->size];
 
-    if(stk->size <= stk->buff/2 - ODDS) {
+    if((long long)stk->size <= (long long)stk->buff/2 - (long long)ODDS) {
         stk->buff /= 2;
         stk_t* sup = (stk_t*)realloc(stk->stk, stk->buff);
 #ifdef DEBUG
@@ -235,7 +235,7 @@ int StackPrint(stack* stk) {
     else len = stk->buff;
     if(stk->stk != NULL)
         for(i = 0; i < len; i++) {
-            fprintf(stk->stkprint, "       [%u] = %d%s\n", i, stk->stk[i], CheckNumber(stk->stk[i]));
+            fprintf(stk->stkprint, "       [%u] = %f%s\n", i, stk->stk[i], CheckNumber(stk->stk[i]));
         }
     fprintf(stk->stkprint, "   }\n");
     fprintf(stk->stkprint, "   hash = 0x%X\n",  stk->hash);
